@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/FactomProject/factomd/events"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -432,6 +433,8 @@ type State struct {
 	InputRegExString          string
 	executeRecursionDetection map[[32]byte]interfaces.IMsg
 	Hold                      HoldingList
+
+	EventsProxy *events.EventProxy
 }
 
 var _ interfaces.IState = (*State)(nil)
@@ -561,6 +564,7 @@ func (s *State) Clone(cloneNumber int) interfaces.IState {
 	newState.factomdTLSKeyFile = s.factomdTLSKeyFile
 	newState.factomdTLSCertFile = s.factomdTLSCertFile
 	newState.FactomdLocations = s.FactomdLocations
+	newState.EventsProxy = s.EventsProxy
 
 	newState.FastSaveRate = s.FastSaveRate
 	newState.CorsDomains = s.CorsDomains
