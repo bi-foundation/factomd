@@ -2,6 +2,7 @@ package events
 
 import (
 	"encoding/binary"
+	"errors"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/messages/eventmessages"
@@ -12,17 +13,17 @@ import (
 )
 
 type EventMapper interface {
-	MapToFactomEvent(eventInput eventinput.EventInput) *eventmessages.FactomEvent
+	MapToFactomEvent(eventInput eventinput.EventInput) (*eventmessages.FactomEvent, error)
 }
 
-func MapToFactomEvent(eventInput eventinput.EventInput) *eventmessages.FactomEvent {
-	if eventInput.GetMessagePayload() != nil {
-		return msgToFactomEvent(eventInput.GetEventSource(), eventInput.GetMessagePayload())
+func MapToFactomEvent(eventInput eventinput.EventInput) (*eventmessages.FactomEvent, error) {
+	if eventInput.GetMessagePayload() == nil {
+		return nil, errors.New("no payload found in source event")
 	}
-	panic("No payload found in source event.")
+	return msgToFactomEvent(eventInput.GetEventSource(), eventInput.GetMessagePayload())
 }
 
-func msgToFactomEvent(eventSource eventmessages.EventSource, msg interfaces.IMsg) *eventmessages.FactomEvent {
+func msgToFactomEvent(eventSource eventmessages.EventSource, msg interfaces.IMsg) (*eventmessages.FactomEvent, error) {
 	event := &eventmessages.FactomEvent{}
 	event.EventSource = eventSource
 	switch msg.(type) {
@@ -35,9 +36,9 @@ func msgToFactomEvent(eventSource eventmessages.EventSource, msg interfaces.IMsg
 	case *messages.RevealEntryMsg:
 		event.Value = mapRevealEntryEvent(msg)
 	default:
-		return nil
+		return nil, errors.New("unknown message type")
 	}
-	return event
+	return event, nil
 }
 
 func mapDBState(dbStateMessage *messages.DBStateMsg) *eventmessages.FactomEvent_AnchorEvent {

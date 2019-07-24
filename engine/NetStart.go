@@ -52,7 +52,7 @@ var mLog = new(MsgLog)
 var p2pProxy *P2PProxy
 var p2pNetwork *p2p.Controller
 var logPort string
-var EventsProxy *events.EventProxy
+var EventsProxy events.EventService
 
 func GetFnodes() []*FactomNode {
 	return fnodes
@@ -421,9 +421,7 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 		p2pProxy.StartProxy()
 
 		if EventsProxy == nil {
-			EventsProxy = new(events.EventProxy).
-				Init().
-				StartProxy()
+			EventsProxy = events.NewEventProxy()
 		}
 		s.EventsProxy = EventsProxy
 
