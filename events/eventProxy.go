@@ -24,7 +24,7 @@ const (
 	redialSleepDuration       = 5 * time.Second
 )
 
-type IEventProxy interface {
+type EventService interface {
 	Send(event *eventsInput.EventInput)
 }
 
@@ -32,16 +32,18 @@ type EventProxy struct {
 	eventsOutQueue     chan eventsInput.EventInput
 	postponeRetryUntil time.Time
 	connection         net.Conn
+	protocol           string
+	address            string
 }
 
-func (ep *EventProxy) Init() *EventProxy {
-	ep.eventsOutQueue = make(chan eventsInput.EventInput, p2p.StandardChannelSize)
-	return ep
-}
-
-func (ep *EventProxy) StartProxy() *EventProxy {
-	go ep.processEventsChannel()
-	return ep
+func NewEventProxy() EventService {
+	eventProxy := &EventProxy{
+		eventsOutQueue: make(chan eventsInput.EventInput, p2p.StandardChannelSize),
+		protocol:       defaultConnectionProtocol,
+		address:        fmt.Sprintf("%s:%s", defaultConnectionHost, defaultConnectionPort),
+	}
+	go eventProxy.processEventsChannel()
+	return eventProxy
 }
 
 func (ep *EventProxy) Send(event *eventsInput.EventInput) {
@@ -61,7 +63,10 @@ func (ep *EventProxy) processEventsChannel() {
 func (ep *EventProxy) processEvent(event eventsInput.EventInput) {
 	defer handleEventError()
 	if ep.connectionOk() {
-		factomEvent := MapToFactomEvent(event)
+		factomEvent, err := MapToFactomEvent(event)
+		if err != nil {
+
+		}
 		if factomEvent != nil {
 			ep.sendEvent(factomEvent)
 		}
@@ -143,15 +148,14 @@ func (ep *EventProxy) handleSendError(retry *uint32) {
 }
 
 func (ep *EventProxy) dialServer() {
-
 	defer handleConnectError()
 
-	var err error
-	ep.connection, err = net.Dial(defaultConnectionProtocol, fmt.Sprintf("%s:%s", defaultConnectionHost, defaultConnectionPort))
+	connection, err := net.Dial(ep.protocol, ep.address)
 	if err != nil {
 		ep.connection = nil
 		panic(err)
 	}
+	ep.connection = connection
 }
 
 func handleEventError() {
