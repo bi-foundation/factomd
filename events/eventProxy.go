@@ -3,17 +3,17 @@ package events
 import (
 	"bufio"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	eventMessages "github.com/FactomProject/factomd/common/messages/eventmessages"
 	eventsInput "github.com/FactomProject/factomd/common/messages/eventmessages/input"
 	"github.com/FactomProject/factomd/p2p"
 	"github.com/gogo/protobuf/proto"
-	"io"
 	"net"
-	"strings"
-	"sync/atomic"
 	"time"
 )
+
+var connectionError = errors.New("")
 
 const (
 	defaultConnectionProtocol = "tcp"
@@ -54,127 +54,89 @@ func (ep *EventProxy) Send(event *eventsInput.EventInput) {
 }
 
 func (ep *EventProxy) processEventsChannel() {
-	ep.dialServer()
 	for event := range ep.eventsOutQueue {
 		ep.processEvent(event)
 	}
 }
 
 func (ep *EventProxy) processEvent(event eventsInput.EventInput) {
-	defer handleEventError()
-	if ep.connectionOk() {
-		factomEvent, err := MapToFactomEvent(event)
-		if err != nil {
+	factomEvent, err := MapToFactomEvent(event)
+	if err != nil || factomEvent == nil {
+		// TODO handle error
+		fmt.Printf("TODO error logging: %v\n", err)
+		return
+	}
 
-		}
-		if factomEvent != nil {
-			ep.sendEvent(factomEvent)
-		}
+	if err := ep.sendEvent(factomEvent); err != nil {
+		// TODO handle error
+		fmt.Printf("TODO error logging: %v\n", err)
+		return
 	}
 }
 
-func (ep *EventProxy) connectionOk() bool {
+func (ep *EventProxy) sendEvent(event *eventMessages.FactomEvent) error {
+	data, err := ep.marshallEvent(event)
+	if err != nil {
+		return fmt.Errorf("TODO error logging: %v", err)
+	}
+
+	// retry sending event ... times
+	sendSuccessful := false
+	for retry := 0; retry < sendRetries || sendSuccessful; retry++ {
+		if err = ep.connect(); err != nil {
+			// TODO handle error
+			return fmt.Errorf("TODO error logging: %v", err)
+		}
+
+		// send the factom event to the live api
+		if err = ep.writeEvent(data); err == nil {
+			sendSuccessful = true
+		} else {
+			// TODO handle / log error
+			fmt.Printf("TODO error logging: %v\n", err)
+			if err == connectionError {
+				// reset connection and retry
+				ep.connection = nil
+			}
+		}
+	}
+
+	return nil
+}
+
+func (ep *EventProxy) connect() error {
 	if ep.connection == nil {
-		// We'll try to reconnect only once, if the receiver is still not there we try again later but we won't let the queue fill up.
-		// These events will be skipped.
-		if ep.postponeRetryUntil.IsZero() || time.Now().After(ep.postponeRetryUntil) {
-			ep.dialServer()
-			if ep.connection == nil {
-				ep.postponeRetryUntil = time.Now().Add(dialRetryPostponeDuration)
-				return false
-			}
+		conn, err := net.Dial(ep.protocol, ep.address)
+		if err != nil {
+			return fmt.Errorf("failed to connect to %s at %s: %v", ep.protocol, ep.address, err)
 		}
-		return false
+		ep.connection = conn
+		ep.postponeRetryUntil = time.Unix(0, 0)
 	}
-	ep.postponeRetryUntil = time.Unix(0, 0)
-	return true
+	return nil
 }
 
-func (ep *EventProxy) sendEvent(event *eventMessages.FactomEvent) {
+func (ep *EventProxy) marshallEvent(event *eventMessages.FactomEvent) (data []byte, err error) {
+	data, err = proto.Marshal(event)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshell event: %v", err)
+	}
+	return data, err
+}
+
+func (ep *EventProxy) writeEvent(data []byte) (err error) {
 	writer := bufio.NewWriter(ep.connection)
-	retry := uint32(0)
-	sentOk := false
-	for !sentOk {
-		defer ep.handleSendError(&retry)
 
-		messageBuffer := ep.marshallEvent(event)
-		writeMessageLength(writer, len(messageBuffer))
-		sentOk = ep.writeMessage(writer, messageBuffer)
-	}
-}
-
-func (ep *EventProxy) marshallEvent(event *eventMessages.FactomEvent) []byte {
-	messageBuffer, err := proto.Marshal(event)
+	dataSize := int32(len(data))
+	err = binary.Write(writer, binary.LittleEndian, dataSize)
 	if err != nil {
-		panic(fmt.Sprint("An error occurred when marshalling an event to a protocol buffer", err))
+		return fmt.Errorf("failed to write data size: %v", err)
 	}
-	return messageBuffer
-}
 
-func writeMessageLength(writer *bufio.Writer, length int) {
-	err := binary.Write(writer, binary.LittleEndian, int32(length))
+	_, err = writer.Write(data)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("failed to write data: %v", err)
 	}
-}
-
-func (ep *EventProxy) writeMessage(writer *bufio.Writer, messageBuffer []byte) bool {
-	_, err := writer.Write(messageBuffer)
-	ep.assertSendError(err)
 	err = writer.Flush()
-	ep.assertSendError(err)
-	return true
-}
-
-func (ep *EventProxy) assertSendError(err error) {
-	if err != nil {
-		if err == io.EOF || strings.Contains(err.Error(), "broken pipe") {
-			ep.redial()
-			if ep.connection == nil {
-				ep.postponeRetryUntil = time.Now().Add(dialRetryPostponeDuration)
-			}
-		}
-		panic(fmt.Sprint("Event network error ", err))
-	}
-}
-
-func (ep *EventProxy) handleSendError(retry *uint32) {
-	atomic.AddUint32(retry, 1)
-	if *retry < sendRetries && (ep.postponeRetryUntil.IsZero() || time.Now().After(ep.postponeRetryUntil)) {
-		if r := recover(); r != nil {
-			fmt.Println("Unable to send event", r)
-		}
-	}
-}
-
-func (ep *EventProxy) dialServer() {
-	defer handleConnectError()
-
-	connection, err := net.Dial(ep.protocol, ep.address)
-	if err != nil {
-		ep.connection = nil
-		panic(err)
-	}
-	ep.connection = connection
-}
-
-func handleEventError() {
-	if r := recover(); r != nil {
-		fmt.Println("Unable to process event, proceeding with the next.", r)
-	}
-}
-
-func handleConnectError() {
-	if r := recover(); r != nil {
-		fmt.Println("Unable to dial event server", r)
-	}
-}
-
-func (ep *EventProxy) redial() {
-	err := ep.connection.Close()
-	if err != nil {
-		fmt.Println("Close connection returned an error", err)
-	}
-	ep.connection = nil
-	ep.dialServer()
+	return nil
 }

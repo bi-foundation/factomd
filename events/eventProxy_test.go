@@ -4,16 +4,33 @@ import (
 	"encoding/json"
 	"fmt"
 	. "github.com/FactomProject/factomd/common/messages/eventmessages"
+	eventsinput "github.com/FactomProject/factomd/common/messages/eventmessages/input"
+	"github.com/FactomProject/factomd/testHelper"
 	"github.com/gogo/protobuf/proto"
 	"github.com/gogo/protobuf/types"
 	"testing"
-	time2 "time"
+	"time"
 )
 
 var (
 	entries  = 10000
 	testHash = []byte("12345678901234567890123456789012")
 )
+
+func TestEventProxy_Send(t *testing.T) {
+	eventProxy := NewEventProxy()
+
+	// msgs := make([]interfaces.IMsg, 10)
+
+	msgs := testHelper.CreateTestDBStateList()
+
+	for _, msg := range msgs {
+		event := eventsinput.SourceEventFromMessage(EventSource_ADD_TO_PROCESSLIST, msg)
+		eventProxy.Send(event)
+	}
+
+	time.Sleep(10 * time.Second)
+}
 
 func BenchmarkMarshalAnchorEventToBinary(b *testing.B) {
 	b.StopTimer()
@@ -63,7 +80,7 @@ func mockDirectoryBlock() *DirectoryBlock {
 }
 
 func mockDirHeader() *DirectoryBlockHeader {
-	time := time2.Now()
+	t := time.Now()
 	result := &DirectoryBlockHeader{
 		BodyMerkleRoot: &Hash{
 			HashValue: testHash,
@@ -74,7 +91,7 @@ func mockDirHeader() *DirectoryBlockHeader {
 		PreviousFullHash: &Hash{
 			HashValue: testHash,
 		},
-		Timestamp:  &types.Timestamp{Seconds: int64(time.Second()), Nanos: int32(time.Nanosecond())},
+		Timestamp:  &types.Timestamp{Seconds: int64(t.Second()), Nanos: int32(t.Nanosecond())},
 		DbHeight:   123,
 		BlockCount: 456,
 	}
