@@ -13,10 +13,10 @@ import (
 )
 
 type EventMapper interface {
-	MapToFactomEvent(eventInput eventinput.EventInput) (*eventmessages.FactomEvent, error)
+	MapToFactomEvent(eventInput *eventinput.EventInput) (*eventmessages.FactomEvent, error)
 }
 
-func MapToFactomEvent(eventInput eventinput.EventInput) (*eventmessages.FactomEvent, error) {
+func MapToFactomEvent(eventInput *eventinput.EventInput) (*eventmessages.FactomEvent, error) {
 	if eventInput.GetMessagePayload() == nil {
 		return nil, errors.New("no payload found in source event")
 	}

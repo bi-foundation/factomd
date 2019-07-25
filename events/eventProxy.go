@@ -25,11 +25,11 @@ const (
 )
 
 type EventService interface {
-	Send(event *eventsInput.EventInput)
+	Send(event *eventsInput.EventInput) error
 }
 
 type EventProxy struct {
-	eventsOutQueue     chan eventsInput.EventInput
+	eventsOutQueue     chan *eventMessages.FactomEvent
 	postponeRetryUntil time.Time
 	connection         net.Conn
 	protocol           string
@@ -37,47 +37,44 @@ type EventProxy struct {
 }
 
 func NewEventProxy() EventService {
+	return NewEventProxyTo(defaultConnectionProtocol, fmt.Sprintf("%s:%s", defaultConnectionHost, defaultConnectionPort))
+}
+
+func NewEventProxyTo(protocol string, address string) EventService {
 	eventProxy := &EventProxy{
-		eventsOutQueue: make(chan eventsInput.EventInput, p2p.StandardChannelSize),
-		protocol:       defaultConnectionProtocol,
-		address:        fmt.Sprintf("%s:%s", defaultConnectionHost, defaultConnectionPort),
+		eventsOutQueue: make(chan *eventMessages.FactomEvent, p2p.StandardChannelSize),
+		protocol:       protocol,
+		address:        address,
 	}
 	go eventProxy.processEventsChannel()
 	return eventProxy
 }
 
-func (ep *EventProxy) Send(event *eventsInput.EventInput) {
+func (ep *EventProxy) Send(event *eventsInput.EventInput) error {
+	factomEvent, err := MapToFactomEvent(event)
+	if err != nil {
+		return fmt.Errorf("failed to map to factom event: %v\n", err)
+	}
+
 	select {
-	case ep.eventsOutQueue <- *event:
+	case ep.eventsOutQueue <- factomEvent:
 	default:
 	}
+
+	return nil
 }
 
 func (ep *EventProxy) processEventsChannel() {
 	for event := range ep.eventsOutQueue {
-		ep.processEvent(event)
+		ep.sendEvent(event)
 	}
 }
 
-func (ep *EventProxy) processEvent(event eventsInput.EventInput) {
-	factomEvent, err := MapToFactomEvent(event)
-	if err != nil || factomEvent == nil {
-		// TODO handle error
-		fmt.Printf("TODO error logging: %v\n", err)
-		return
-	}
-
-	if err := ep.sendEvent(factomEvent); err != nil {
-		// TODO handle error
-		fmt.Printf("TODO error logging: %v\n", err)
-		return
-	}
-}
-
-func (ep *EventProxy) sendEvent(event *eventMessages.FactomEvent) error {
+func (ep *EventProxy) sendEvent(event *eventMessages.FactomEvent) {
 	data, err := ep.marshallEvent(event)
 	if err != nil {
-		return fmt.Errorf("TODO error logging: %v", err)
+		fmt.Printf("TODO error logging: %v", err)
+		return
 	}
 
 	// retry sending event ... times
@@ -85,7 +82,8 @@ func (ep *EventProxy) sendEvent(event *eventMessages.FactomEvent) error {
 	for retry := 0; retry < sendRetries || sendSuccessful; retry++ {
 		if err = ep.connect(); err != nil {
 			// TODO handle error
-			return fmt.Errorf("TODO error logging: %v", err)
+			fmt.Printf("TODO error logging: %v", err)
+			return
 		}
 
 		// send the factom event to the live api
@@ -100,8 +98,6 @@ func (ep *EventProxy) sendEvent(event *eventMessages.FactomEvent) error {
 			}
 		}
 	}
-
-	return nil
 }
 
 func (ep *EventProxy) connect() error {
