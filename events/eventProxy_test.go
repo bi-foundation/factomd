@@ -22,6 +22,32 @@ var (
 	testHash = []byte("12345678901234567890123456789012")
 )
 
+func TestNoReceivingServer(t *testing.T) {
+	protocol := "tcp"
+	address := ":12410"
+
+	eventProxy := NewEventProxyTo(protocol, address)
+	msgs := testHelper.CreateTestDBStateList()
+
+	msg := msgs[0]
+	event := eventsinput.SourceEventFromMessage(EventSource_ADD_TO_PROCESSLIST, msg)
+	eventProxy.Send(event)
+
+	time.Sleep(2 * time.Second) // sleep less than the retry * redail sleep duration
+
+	// listen for results
+	var correctSendEvents int32 = 0
+	listener, err := net.Listen(protocol, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	go listenForEvents(t, listener, &correctSendEvents, len(msgs))
+
+	waitOnEvents(&correctSendEvents, 1, 10*time.Second)
+	assert.EqualValues(t, 1, correctSendEvents, "failed to receive the correct number of events %d != %d", 1, correctSendEvents)
+}
+
 func TestEventProxy_Send(t *testing.T) {
 	protocol := "tcp"
 	address := ":12409"
@@ -44,7 +70,7 @@ func TestEventProxy_Send(t *testing.T) {
 		eventProxy.Send(event)
 	}
 
-	waitOnEvents(&correctSendEvents, len(msgs), 40*time.Second)
+	waitOnEvents(&correctSendEvents, len(msgs), 10*time.Second)
 
 	assert.EqualValues(t, len(msgs), correctSendEvents, "failed to receive the correct number of events %d != %d", len(msgs), correctSendEvents)
 }
@@ -60,6 +86,7 @@ func listenForEvents(t *testing.T, listener net.Listener, correctSendEvents *int
 	conn, err := listener.Accept()
 	if err != nil {
 		fmt.Printf("failed to accept connection: %v\n", err)
+		return
 	}
 	defer conn.Close()
 	reader := bufio.NewReader(conn)
