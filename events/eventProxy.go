@@ -3,7 +3,6 @@ package events
 import (
 	"bufio"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	eventMessages "github.com/FactomProject/factomd/common/messages/eventmessages"
 	eventsInput "github.com/FactomProject/factomd/common/messages/eventmessages/input"
@@ -12,8 +11,6 @@ import (
 	"net"
 	"time"
 )
-
-var connectionError = errors.New("")
 
 const (
 	defaultConnectionProtocol = "tcp"
@@ -83,7 +80,8 @@ func (ep *EventProxy) sendEvent(event *eventMessages.FactomEvent) {
 		if err = ep.connect(); err != nil {
 			// TODO handle error
 			fmt.Printf("TODO error logging: %v", err)
-			return
+			time.Sleep(redialSleepDuration)
+			continue
 		}
 
 		// send the factom event to the live api
@@ -92,10 +90,10 @@ func (ep *EventProxy) sendEvent(event *eventMessages.FactomEvent) {
 		} else {
 			// TODO handle / log error
 			fmt.Printf("TODO error logging: %v\n", err)
-			if err == connectionError {
-				// reset connection and retry
-				ep.connection = nil
-			}
+
+			// reset connection and retry
+			time.Sleep(redialSleepDuration)
+			ep.connection = nil
 		}
 	}
 }
@@ -104,7 +102,7 @@ func (ep *EventProxy) connect() error {
 	if ep.connection == nil {
 		conn, err := net.Dial(ep.protocol, ep.address)
 		if err != nil {
-			return fmt.Errorf("failed to connect to %s at %s: %v", ep.protocol, ep.address, err)
+			return fmt.Errorf("failed to connect: %v", err)
 		}
 		ep.connection = conn
 		ep.postponeRetryUntil = time.Unix(0, 0)
