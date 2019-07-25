@@ -1,6 +1,8 @@
 package events
 
 import (
+	"bufio"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	. "github.com/FactomProject/factomd/common/messages/eventmessages"
@@ -8,6 +10,9 @@ import (
 	"github.com/FactomProject/factomd/testHelper"
 	"github.com/gogo/protobuf/proto"
 	"github.com/gogo/protobuf/types"
+	"github.com/stretchr/testify/assert"
+	"net"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -18,18 +23,66 @@ var (
 )
 
 func TestEventProxy_Send(t *testing.T) {
-	eventProxy := NewEventProxy()
+	protocol := "tcp"
+	address := ":12409"
 
-	// msgs := make([]interfaces.IMsg, 10)
-
+	eventProxy := NewEventProxyTo(protocol, address)
 	msgs := testHelper.CreateTestDBStateList()
 
+	// listen for results
+	var correctSendEvents int32 = 0
+	listener, err := net.Listen(protocol, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	go listenForEvents(t, listener, &correctSendEvents, len(msgs))
+
+	// send messages
 	for _, msg := range msgs {
 		event := eventsinput.SourceEventFromMessage(EventSource_ADD_TO_PROCESSLIST, msg)
 		eventProxy.Send(event)
 	}
 
-	time.Sleep(10 * time.Second)
+	waitOnEvents(&correctSendEvents, len(msgs), 40*time.Second)
+
+	assert.EqualValues(t, len(msgs), correctSendEvents, "failed to receive the correct number of events %d != %d", len(msgs), correctSendEvents)
+}
+
+func waitOnEvents(correctSendEvents *int32, n int, timeLimit time.Duration) {
+	deadline := time.Now().Add(timeLimit)
+	for int(atomic.LoadInt32(correctSendEvents)) != n && time.Now().Before(deadline) {
+		time.Sleep(100 * time.Millisecond)
+	}
+}
+
+func listenForEvents(t *testing.T, listener net.Listener, correctSendEvents *int32, n int) {
+	conn, err := listener.Accept()
+	if err != nil {
+		fmt.Printf("failed to accept connection: %v\n", err)
+	}
+	defer conn.Close()
+	reader := bufio.NewReader(conn)
+
+	for i := atomic.LoadInt32(correctSendEvents); i < int32(n); i++ {
+		fmt.Printf("read event: %d/%d\n", i, n)
+		var dataSize int32
+		if err := binary.Read(reader, binary.LittleEndian, &dataSize); err != nil {
+			fmt.Printf("failed to read data size: %v\n", err)
+		}
+
+		if dataSize < 1 {
+			fmt.Printf("data size incorrect: %d\n", dataSize)
+		}
+		data := make([]byte, dataSize)
+		bytesRead, err := reader.Read(data)
+		if err != nil {
+			fmt.Printf("failed to read data: %v\n", err)
+		}
+
+		t.Logf("%v", data[0:bytesRead])
+		atomic.AddInt32(correctSendEvents, 1)
+	}
 }
 
 func BenchmarkMarshalAnchorEventToBinary(b *testing.B) {

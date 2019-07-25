@@ -79,7 +79,7 @@ func (ep *EventProxy) sendEvent(event *eventMessages.FactomEvent) {
 
 	// retry sending event ... times
 	sendSuccessful := false
-	for retry := 0; retry < sendRetries || sendSuccessful; retry++ {
+	for retry := 0; retry < sendRetries && !sendSuccessful; retry++ {
 		if err = ep.connect(); err != nil {
 			// TODO handle error
 			fmt.Printf("TODO error logging: %v", err)
