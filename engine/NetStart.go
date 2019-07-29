@@ -421,9 +421,9 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 		p2pProxy.StartProxy()
 
 		if EventsProxy == nil {
-			EventsProxy = events.NewEventProxy()
+			EventsProxy = events.NewEventProxy(s)
 		}
-		s.EventsProxy = EventsProxy
+		s.EventsService = EventsProxy
 
 		go networkHousekeeping() // This goroutine executes once a second to keep the proxy apprised of the network status.
 	}

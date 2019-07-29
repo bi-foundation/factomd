@@ -7,6 +7,7 @@ import (
 	"fmt"
 	. "github.com/FactomProject/factomd/common/messages/eventmessages"
 	eventsinput "github.com/FactomProject/factomd/common/messages/eventmessages/input"
+	state2 "github.com/FactomProject/factomd/state"
 	"github.com/FactomProject/factomd/testHelper"
 	"github.com/gogo/protobuf/proto"
 	"github.com/gogo/protobuf/types"
@@ -26,11 +27,11 @@ func TestNoReceivingServer(t *testing.T) {
 	protocol := "tcp"
 	address := ":12410"
 
-	eventProxy := NewEventProxyTo(protocol, address)
+	eventProxy := NewEventProxyTo(protocol, address, state2.state)
 	msgs := testHelper.CreateTestDBStateList()
 
 	msg := msgs[0]
-	event := eventsinput.SourceEventFromMessage(EventSource_ADD_TO_PROCESSLIST, msg)
+	event := eventsinput.eventFromMessage(EventSource_ADD_TO_PROCESSLIST, msg)
 	eventProxy.Send(event)
 
 	time.Sleep(2 * time.Second) // sleep less than the retry * redail sleep duration
@@ -52,7 +53,7 @@ func TestEventProxy_Send(t *testing.T) {
 	protocol := "tcp"
 	address := ":12409"
 
-	eventProxy := NewEventProxyTo(protocol, address)
+	eventProxy := NewEventProxyTo(protocol, address, state2.state)
 	msgs := testHelper.CreateTestDBStateList()
 
 	// listen for results
@@ -66,7 +67,7 @@ func TestEventProxy_Send(t *testing.T) {
 
 	// send messages
 	for _, msg := range msgs {
-		event := eventsinput.SourceEventFromMessage(EventSource_ADD_TO_PROCESSLIST, msg)
+		event := eventsinput.eventFromMessage(EventSource_ADD_TO_PROCESSLIST, msg)
 		eventProxy.Send(event)
 	}
 
