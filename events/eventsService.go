@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"encoding/binary"
 	"fmt"
-	eventMessages "github.com/FactomProject/factomd/common/messages/eventmessages"
-	eventsInput "github.com/FactomProject/factomd/common/messages/eventmessages/input"
+	"github.com/FactomProject/factomd/common/constants/runstate"
+	"github.com/FactomProject/factomd/common/interfaces"
+	"github.com/FactomProject/factomd/events/eventmessages"
+	eventsinput "github.com/FactomProject/factomd/events/eventmessages/input"
 	"github.com/FactomProject/factomd/p2p"
 	"github.com/gogo/protobuf/proto"
 	"net"
@@ -22,32 +24,40 @@ const (
 )
 
 type EventService interface {
-	Send(event *eventsInput.EventInput) error
+	Send(event *eventsinput.EventInput) error
+	HasQueuedMessages() bool
+	WaitForQueuedMessages()
 }
 
 type EventProxy struct {
-	eventsOutQueue     chan *eventMessages.FactomEvent
+	eventsOutQueue     chan *eventmessages.FactomEvent
 	postponeRetryUntil time.Time
 	connection         net.Conn
 	protocol           string
 	address            string
+	owningState        interfaces.IState
 }
 
-func NewEventProxy() EventService {
-	return NewEventProxyTo(defaultConnectionProtocol, fmt.Sprintf("%s:%s", defaultConnectionHost, defaultConnectionPort))
+func NewEventProxy(state interfaces.IState) EventService {
+	return NewEventProxyTo(defaultConnectionProtocol, fmt.Sprintf("%s:%s", defaultConnectionHost, defaultConnectionPort), state)
 }
 
-func NewEventProxyTo(protocol string, address string) EventService {
+func NewEventProxyTo(protocol string, address string, state interfaces.IState) EventService {
 	eventProxy := &EventProxy{
-		eventsOutQueue: make(chan *eventMessages.FactomEvent, p2p.StandardChannelSize),
+		eventsOutQueue: make(chan *eventmessages.FactomEvent, p2p.StandardChannelSize),
 		protocol:       protocol,
 		address:        address,
+		owningState:    state,
 	}
 	go eventProxy.processEventsChannel()
 	return eventProxy
 }
 
-func (ep *EventProxy) Send(event *eventsInput.EventInput) error {
+func (ep *EventProxy) Send(event *eventsinput.EventInput) error {
+	if ep.owningState.GetRunState() > runstate.Running { // Stop queuing messages to the events channel when shutting down
+		return nil
+	}
+
 	factomEvent, err := MapToFactomEvent(event)
 	if err != nil {
 		return fmt.Errorf("failed to map to factom event: %v\n", err)
@@ -67,7 +77,7 @@ func (ep *EventProxy) processEventsChannel() {
 	}
 }
 
-func (ep *EventProxy) sendEvent(event *eventMessages.FactomEvent) {
+func (ep *EventProxy) sendEvent(event *eventmessages.FactomEvent) {
 	data, err := ep.marshallEvent(event)
 	if err != nil {
 		fmt.Printf("TODO error logging: %v", err)
@@ -110,7 +120,7 @@ func (ep *EventProxy) connect() error {
 	return nil
 }
 
-func (ep *EventProxy) marshallEvent(event *eventMessages.FactomEvent) (data []byte, err error) {
+func (ep *EventProxy) marshallEvent(event *eventmessages.FactomEvent) (data []byte, err error) {
 	data, err = proto.Marshal(event)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshell event: %v", err)
@@ -133,4 +143,14 @@ func (ep *EventProxy) writeEvent(data []byte) (err error) {
 	}
 	err = writer.Flush()
 	return nil
+}
+
+func (ep *EventProxy) HasQueuedMessages() bool {
+	return len(ep.eventsOutQueue) > 0
+}
+
+func (ep *EventProxy) WaitForQueuedMessages() {
+	for ep.HasQueuedMessages() {
+		time.Sleep(25 & time.Millisecond)
+	}
 }
