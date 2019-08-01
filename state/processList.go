@@ -7,6 +7,7 @@ package state
 import (
 	"bytes"
 	"fmt"
+	"github.com/FactomProject/factomd/events/eventmessages"
 	"os"
 	"strings"
 	"sync"
@@ -1103,6 +1104,7 @@ func (p *ProcessList) AddToProcessList(s *State, ack *messages.Ack, m interfaces
 
 	m.SendOut(s, m)
 	ack.SendOut(s, ack)
+	emitEvent(eventmessages.EventSource_ADD_TO_PROCESSLIST, m, s)
 }
 
 func (p *ProcessList) ContainsDBSig(serverID interfaces.IHash) bool {
