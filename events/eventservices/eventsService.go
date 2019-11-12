@@ -43,7 +43,7 @@ type eventServiceInstance struct {
 	eventsOutQueue          chan *eventmessages.FactomEvent
 	postponeSendingUntil    time.Time
 	connection              net.Conn
-	owningState             ServiceOwnerState
+	ownerState              ServiceOwnerState
 	droppedFromQueueCounter prometheus.Counter
 	notSentCounter          prometheus.Counter
 }
@@ -51,7 +51,9 @@ type eventServiceInstance struct {
 type ServiceOwnerState interface {
 	GetRunState() runstate.RunState
 	GetIdentityChainID() interfaces.IHash
+	GetFactomNodeName() string
 	IsRunLeader() bool
+	GetDB() interfaces.DBOverlaySimple
 }
 
 func NewEventService(state ServiceOwnerState, config *util.FactomdConfig, factomParams *globals.FactomParams) (EventService, EventServiceControl) {
@@ -63,7 +65,7 @@ func NewEventServiceTo(state ServiceOwnerState, params *EventServiceParams) (Eve
 		eventServiceInstance := &eventServiceInstance{
 			eventsOutQueue: make(chan *eventmessages.FactomEvent, p2p.StandardChannelSize),
 			params:         params,
-			owningState:    state,
+			ownerState:     state,
 		}
 		eventService = eventServiceInstance
 		eventServiceControl = eventServiceInstance
@@ -83,12 +85,12 @@ func NewEventServiceTo(state ServiceOwnerState, params *EventServiceParams) (Eve
 }
 
 func (esi *eventServiceInstance) Send(event events.EventInput) error {
-	if esi.owningState.GetRunState() > runstate.Running { // Stop queuing messages to the events channel when shutting down
+	if esi.ownerState.GetRunState() > runstate.Running { // Stop queuing messages to the events channel when shutting down
 		return nil
 	}
 
 	// Only send info messages when EventReplayDuringStartup is disabled
-	if !esi.params.ReplayDuringStartup && !esi.owningState.IsRunLeader() {
+	if !esi.params.ReplayDuringStartup && !esi.ownerState.IsRunLeader() {
 		switch event.(type) {
 		case *events.ProcessListEvent:
 		case *events.NodeMessageEvent:
@@ -99,7 +101,7 @@ func (esi *eventServiceInstance) Send(event events.EventInput) error {
 
 	broadcastContent := esi.GetBroadcastContent()
 	sendStateChangeEvents := esi.IsSendStateChangeEvents()
-	factomEvent, err := MapToFactomEvent(event, broadcastContent, sendStateChangeEvents)
+	factomEvent, err := MapToFactomEvent(event, broadcastContent, sendStateChangeEvents, esi.ownerState)
 	if err != nil {
 		return fmt.Errorf("failed to map to factom event: %v\n", err)
 	}
@@ -107,7 +109,6 @@ func (esi *eventServiceInstance) Send(event events.EventInput) error {
 		return nil
 	}
 
-	factomEvent.IdentityChainID = esi.owningState.GetIdentityChainID().Bytes()
 	select {
 	case esi.eventsOutQueue <- factomEvent:
 	default:

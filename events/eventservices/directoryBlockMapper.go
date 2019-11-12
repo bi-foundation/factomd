@@ -5,7 +5,7 @@ import (
 	"github.com/FactomProject/factomd/events/eventmessages/generated/eventmessages"
 )
 
-func mapDirectoryBlock(block interfaces.IDirectoryBlock) *eventmessages.DirectoryBlock {
+func mapDirectoryBlock(block interfaces.IDirectoryBlock, ownerState ServiceOwnerState) *eventmessages.DirectoryBlock {
 	result := &eventmessages.DirectoryBlock{
 		Header:  mapDirectoryBlockHeader(block.GetHeader()),
 		Entries: mapDirectoryBlockEntries(block.GetDBEntries()),

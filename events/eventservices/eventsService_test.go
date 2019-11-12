@@ -103,7 +103,7 @@ func TestEventsService_SendFillupQueue(t *testing.T) {
 	n := 3
 	eventService := &eventServiceInstance{
 		eventsOutQueue: make(chan *eventmessages.FactomEvent, n),
-		owningState: StateMock{
+		ownerState: StateMock{
 			IdentityChainID: primitives.NewZeroHash(),
 		},
 		params:                  &EventServiceParams{},
@@ -127,7 +127,7 @@ func TestEventsService_SendNoStartupMessages(t *testing.T) {
 		"queue-filled": {
 			Service: &eventServiceInstance{
 				eventsOutQueue: make(chan *eventmessages.FactomEvent, 0),
-				owningState: StateMock{
+				ownerState: StateMock{
 					IdentityChainID: primitives.NewZeroHash(),
 				},
 				params:                  &EventServiceParams{},
@@ -143,7 +143,7 @@ func TestEventsService_SendNoStartupMessages(t *testing.T) {
 		"not-running": {
 			Service: &eventServiceInstance{
 				eventsOutQueue: make(chan *eventmessages.FactomEvent, p2p.StandardChannelSize),
-				owningState: StateMock{
+				ownerState: StateMock{
 					RunState: runstate.Stopping,
 				},
 			},
@@ -156,7 +156,7 @@ func TestEventsService_SendNoStartupMessages(t *testing.T) {
 		"nil-event": {
 			Service: &eventServiceInstance{
 				eventsOutQueue: make(chan *eventmessages.FactomEvent, p2p.StandardChannelSize),
-				owningState:    StateMock{},
+				ownerState:     StateMock{},
 				params: &EventServiceParams{
 					ReplayDuringStartup: true,
 				},
@@ -170,7 +170,7 @@ func TestEventsService_SendNoStartupMessages(t *testing.T) {
 		"mute-replay-starting": {
 			Service: &eventServiceInstance{
 				eventsOutQueue: make(chan *eventmessages.FactomEvent, p2p.StandardChannelSize),
-				owningState: StateMock{
+				ownerState: StateMock{
 					RunLeader: false,
 				},
 				params: &EventServiceParams{
@@ -646,7 +646,7 @@ func BenchmarkEventService_Send(b *testing.B) {
 		eventsOutQueue:          make(chan *eventmessages.FactomEvent, p2p.StandardChannelSize),
 		connection:              client,
 		params:                  params,
-		owningState:             state,
+		ownerState:              state,
 		droppedFromQueueCounter: prometheus.NewCounter(prometheus.CounterOpts{}),
 		notSentCounter:          prometheus.NewCounter(prometheus.CounterOpts{}),
 	}

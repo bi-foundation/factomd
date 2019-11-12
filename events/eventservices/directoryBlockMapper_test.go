@@ -10,7 +10,7 @@ import (
 
 func TestMapDirectoryBlock(t *testing.T) {
 	block := new(directoryBlock.DirectoryBlock)
-	directoryBlock := mapDirectoryBlock(block)
+	directoryBlock := mapDirectoryBlock(block, nil)
 
 	assert.NotNil(t, directoryBlock.Header)
 	assert.NotNil(t, directoryBlock.Entries)

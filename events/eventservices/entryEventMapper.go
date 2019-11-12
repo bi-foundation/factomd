@@ -87,10 +87,25 @@ func mapEntryBlockHeader(header interfaces.IEntryBlockHeader) *eventmessages.Ent
 	}
 }
 
-func mapEntryBlockEntries(entries []interfaces.IEBEntry, shouldIncludeContent bool) []*eventmessages.EntryBlockEntry {
-	result := make([]*eventmessages.EntryBlockEntry, len(entries))
-	for i, entry := range entries {
-		result[i] = mapEntryBlockEntry(entry, shouldIncludeContent)
+func mapEntryBlockEntries(blocks []interfaces.IEntryBlock, shouldIncludeContent bool, ownerState ServiceOwnerState) []*eventmessages.EntryBlockEntry {
+	// Count number of entries in all blocks
+	var entryCount = 0
+	for _, block := range blocks {
+		entryCount += len(block.GetEntryHashes())
+	}
+
+	// Fetch entries from DB
+	db := ownerState.GetDB()
+	result := make([]*eventmessages.EntryBlockEntry, entryCount)
+	var currentEntry = 0
+	for _, block := range blocks {
+		for _, entryHash := range block.GetEntryHashes() {
+			entry, err := db.FetchEntry(entryHash)
+			if err != nil && entry != nil {
+				result[currentEntry] = mapEntryBlockEntry(entry, shouldIncludeContent)
+				currentEntry++
+			}
+		}
 	}
 	return result
 }

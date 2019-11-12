@@ -100,7 +100,7 @@ func TestMapEntryBlockHeader(t *testing.T) {
 
 func TestMapEntryBlockEntries(t *testing.T) {
 	entries := []interfaces.IEBEntry{new(entryBlock.Entry)}
-	entryBlockEntries := mapEntryBlockEntries(entries, false)
+	entryBlockEntries := mapEntryBlockEntries(nil, false, nil)
 
 	assert.NotNil(t, entryBlockEntries)
 	assert.Equal(t, 1, len(entryBlockEntries))
@@ -115,7 +115,7 @@ func TestMapEntryBlockEntries(t *testing.T) {
 func TestMapEntryBlockEntriesWithContent(t *testing.T) {
 	entry := entryBlock.RandomEntry()
 	entries := []interfaces.IEBEntry{entry}
-	entryBlockEntries := mapEntryBlockEntries(entries, true)
+	entryBlockEntries := mapEntryBlockEntries(nil, true, nil)
 
 	assert.NotNil(t, entryBlockEntries)
 	assert.Equal(t, 1, len(entryBlockEntries))

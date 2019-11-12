@@ -29,7 +29,7 @@ func TestDBStateMapping(t *testing.T) {
 	assert.Len(t, data, 2409, msgChangedMessage("DBStateMsg"))
 
 	inputEvent := events.NewStateChangeEventFromMsg(eventmessages.EventSource_LIVE, eventmessages.EntityState_COMMITTED_TO_DIRECTORY_BLOCK, msg)
-	event, err := eventservices.MapToFactomEvent(inputEvent, eventservices.BroadcastAlways, true)
+	event, err := eventservices.MapToFactomEvent(inputEvent, eventservices.BroadcastAlways, true, nil)
 	if err != nil {
 		t.Error(err)
 	}
@@ -119,7 +119,7 @@ func TestCommitChainMapping(t *testing.T) {
 	assert.Len(t, data, 201, msgChangedMessage("CommitChainMsg"))
 
 	inputEvent := events.NewRegistrationEvent(eventmessages.EventSource_LIVE, msg)
-	event, err := eventservices.MapToFactomEvent(inputEvent, eventservices.BroadcastAlways, true)
+	event, err := eventservices.MapToFactomEvent(inputEvent, eventservices.BroadcastAlways, true, nil)
 	if err != nil {
 		t.Error(err)
 	}
@@ -150,7 +150,7 @@ func TestCommitEntryMapping(t *testing.T) {
 	assert.Len(t, data, 137, msgChangedMessage("CommitEntryMsg"))
 
 	inputEvent := events.NewRegistrationEvent(eventmessages.EventSource_LIVE, msg)
-	event, err := eventservices.MapToFactomEvent(inputEvent, eventservices.BroadcastAlways, true)
+	event, err := eventservices.MapToFactomEvent(inputEvent, eventservices.BroadcastAlways, true, nil)
 	if err != nil {
 		t.Error(err)
 	}
@@ -182,7 +182,7 @@ func TestEntryRevealMapping(t *testing.T) {
 	assert.Len(t, data, 60, msgChangedMessage("RevealEntryMsg"))
 
 	inputEvent := events.NewRegistrationEvent(eventmessages.EventSource_LIVE, msg)
-	event, err := eventservices.MapToFactomEvent(inputEvent, eventservices.BroadcastAlways, true)
+	event, err := eventservices.MapToFactomEvent(inputEvent, eventservices.BroadcastAlways, true, nil)
 	if err != nil {
 		t.Error(err)
 	}
@@ -218,7 +218,7 @@ func TestStateChangeMapping(t *testing.T) {
 	assert.Len(t, data, 137, msgChangedMessage("CommitEntryMsg"))
 
 	inputEvent := events.NewStateChangeEventFromMsg(eventmessages.EventSource_LIVE, eventmessages.EntityState_ACCEPTED, msg)
-	event, err := eventservices.MapToFactomEvent(inputEvent, eventservices.BroadcastAlways, true)
+	event, err := eventservices.MapToFactomEvent(inputEvent, eventservices.BroadcastAlways, true, nil)
 	if err != nil {
 		t.Error(err)
 	}
@@ -428,7 +428,7 @@ func TestMapToFactomEvent(t *testing.T) {
 
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
-			event, err := eventservices.MapToFactomEvent(testCase.Input, testCase.BroadcastContent, testCase.EventReplayDuringStartup)
+			event, err := eventservices.MapToFactomEvent(testCase.Input, testCase.BroadcastContent, testCase.EventReplayDuringStartup, nil)
 			assert.Nil(t, err)
 
 			if assert.NotNil(t, event) {
@@ -445,7 +445,7 @@ func TestMapToFactomEventRevealNoContentRegistration(t *testing.T) {
 	// same test as TestMapToFactomEvent, except for a registration event with an EntryReveal registration
 	// then no value will be set
 	input := events.NewRegistrationEvent(eventmessages.EventSource_REPLAY_BOOT, newTestEntryReveal())
-	event, err := eventservices.MapToFactomEvent(input, eventservices.BroadcastNever, true)
+	event, err := eventservices.MapToFactomEvent(input, eventservices.BroadcastNever, true, nil)
 	assert.Nil(t, err)
 	assert.Nil(t, event)
 }
