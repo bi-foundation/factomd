@@ -14,6 +14,12 @@ type pubSubPaths struct {
 	LeaderConfig      string
 	LeaderMsgIn       string
 	LeaderMsgOut      string
+	CommitChain       string
+	CommitEntry       string
+	RevealEntry       string
+	CommitDBState     string
+	DBAnchored        string
+	NodeMessage       string
 	ConnectionMetrics string
 	ProcessListInfo   string
 	StateUpdate       string
@@ -30,6 +36,11 @@ var Path = pubSubPaths{
 	ConnectionMetrics: path.Join("connection", "metrics"),
 	ProcessListInfo:   "process-list",
 	StateUpdate:       "state-update",
+	CommitChain:       "commit-chain",
+	CommitEntry:       "commit-entry",
+	RevealEntry:       "reveal-entry",
+	CommitDBState:     "commit-dbstate",
+	NodeMessage:       "node-message",
 }
 
 type Balance struct {
@@ -64,6 +75,35 @@ type LeaderConfig struct {
 
 type EOM struct {
 	Timestamp interfaces.Timestamp
+}
+
+type CommitChain struct {
+	RequestState RequestState
+	DBHeight     uint32
+	CommitChain  ICommitChain
+}
+
+type CommitEntry struct {
+	RequestState RequestState
+	DBHeight     uint32
+	CommitEntry  ICommitEntry
+}
+
+type RevealEntry struct {
+	RequestState RequestState
+	DBHeight     uint32
+	RevealEntry  IRevealEntry
+	MsgTimestamp interfaces.Timestamp
+}
+
+type DBStateCommit struct {
+	DBHeight uint32
+	DBState  IDBState
+}
+
+type DBAnchored struct {
+	DBHeight     uint32
+	DirBlockInfo interfaces.IDirBlockInfo
 }
 
 type ProcessListInfo struct {
