@@ -148,6 +148,7 @@ func NetStart(w *worker.Thread, p *globals.FactomParams, listenToStdin bool) {
 	}
 	startNetwork(w, p)
 	startFnodes(w)
+	startLiveFeed(w, p)
 	startWebserver(w)
 	startControlPanel(w)
 	simulation.StartSimControl(w, p.ListenTo, listenToStdin)
@@ -188,6 +189,14 @@ func initAnchors(s *state.State, reparse bool) {
 		if err != nil {
 			panic("Encountered an error while trying to re-parse anchor chains: " + err.Error())
 		}
+	}
+}
+
+func startLiveFeed(w *worker.Thread, p *globals.FactomParams) {
+	state0 := fnode.Get(0).State
+	config := state0.Cfg.(*util.FactomdConfig)
+	if config.LiveFeedAPI.EnableLiveFeedAPI || p.EnableLiveFeedAPI {
+		state0.LiveFeedService.Start(state0, config, p)
 	}
 }
 
@@ -345,9 +354,9 @@ func makeServer(w *worker.Thread, p *globals.FactomParams) (node *fnode.FactomNo
 	}
 
 	// Election factory was created and passed int to avoid import loop
+	node.State.BuildPubRegistry()
 	node.State.Initialize(w, new(electionMsgs.ElectionsFactory))
 	node.State.NameInit(node, node.State.GetFactomNodeName()+"STATE", reflect.TypeOf(node.State).String())
-	node.State.BuildPubRegistry()
 
 	state0Init.Do(func() {
 		logPort = p.LogPort
