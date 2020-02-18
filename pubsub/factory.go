@@ -9,6 +9,9 @@ func (subFactory) Channel(buffer int) *SubChannel   { return NewSubChannel(buffe
 func (subFactory) Value() *SubValue                 { return NewSubValue() }
 func (subFactory) UnsafeValue() *UnsafeSubValue     { return NewUnsafeSubValue() }
 func (subFactory) Counter() *SubCounter             { return NewSubCounter() }
+func (subFactory) PrometheusCounter(name string, help ...string) *SubPrometheusCounter {
+	return NewSubPrometheusCounter(name, help...)
+}
 
 var PubFactory pubFactory
 
