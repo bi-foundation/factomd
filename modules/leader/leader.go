@@ -29,13 +29,13 @@ func New(s *state.State) *Leader {
 	l.exit = make(chan interface{})
 
 	l.Events = &Events{
-		Config: &event.LeaderConfig{
+		Config: &events.LeaderConfig{
 			Salt:               s.Salt,
 			IdentityChainID:    s.IdentityChainID,
 			ServerPrivKey:      s.ServerPrivKey,
 			BlocktimeInSeconds: s.DirectoryBlockInSeconds,
 		},
-		DBHT: &event.DBHT{ // moved to new height/min
+		DBHT: &events.DBHT{ // moved to new height/min
 			DBHeight: s.DBHeightAtBoot,
 			Minute:   0,
 		},

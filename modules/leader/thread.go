@@ -31,12 +31,12 @@ type Sub struct {
 
 // block level events
 type Events struct {
-	Config         *event.LeaderConfig //
-	*event.DBHT                        // from move-to-ht
-	*event.Balance                     // REVIEW: does this relate to a specific VM
-	*event.Directory
-	*event.Ack // record of last sent ack by leader
-	*event.LeaderConfig
+	Config          *events.LeaderConfig //
+	*events.DBHT                         // from move-to-ht
+	*events.Balance                      // REVIEW: does this relate to a specific VM
+	*events.Directory
+	*events.Ack // record of last sent ack by leader
+	*events.LeaderConfig
 }
 
 func (*Leader) mkChan() *pubsub.SubChannel {
@@ -51,7 +51,7 @@ func (l *Leader) Start(w *worker.Thread) {
 		w.OnExit(l.Exit)
 
 		l.Pub.MsgOut = pubsub.PubFactory.Threaded(100).Publish(
-			pubsub.GetPath("FNode0", event.Path.LeaderMsgOut),
+			pubsub.GetPath("FNode0", events.Path.LeaderMsgOut),
 		)
 		go l.Pub.MsgOut.Start()
 
@@ -76,9 +76,9 @@ func (l *Leader) Ready() {
 	l.Sub.MsgInput.Subscribe(pubsub.GetPath(node0, "bmv", "rest"))
 
 	// internal events
-	l.Sub.MovedToHeight.Subscribe(pubsub.GetPath(node0, event.Path.Seq))
-	l.Sub.DBlockCreated.Subscribe(pubsub.GetPath(node0, event.Path.Directory))
-	l.Sub.BalanceChanged.Subscribe(pubsub.GetPath(node0, event.Path.Bank))
+	l.Sub.MovedToHeight.Subscribe(pubsub.GetPath(node0, events.Path.Seq))
+	l.Sub.DBlockCreated.Subscribe(pubsub.GetPath(node0, events.Path.Directory))
+	l.Sub.BalanceChanged.Subscribe(pubsub.GetPath(node0, events.Path.Bank))
 }
 
 func (l *Leader) processMin() {
@@ -90,7 +90,7 @@ func (l *Leader) processMin() {
 	for {
 		select {
 		case v := <-l.Sub.LeaderConfig.Updates:
-			l.Config = v.(*event.LeaderConfig)
+			l.Config = v.(*events.LeaderConfig)
 		case v := <-l.MsgInput.Updates:
 			m := v.(interfaces.IMsg)
 			// TODO: do leader work - actually validate the message by calling into Bank Service
@@ -111,7 +111,7 @@ func (l *Leader) waitForNextMinute() int {
 	for {
 		select {
 		case v := <-l.MovedToHeight.Updates:
-			evt := v.(*event.DBHT)
+			evt := v.(*events.DBHT)
 			log.LogPrintf(logfile, "DBHT: %v", evt)
 
 			if evt.Minute == 10 {
@@ -134,21 +134,21 @@ func (l *Leader) waitForNextMinute() int {
 func (l *Leader) WaitForDBlockCreated() {
 	for { // wait on a new (unique) directory event
 		v := <-l.Sub.DBlockCreated.Updates
-		evt := v.(*event.Directory)
+		evt := v.(*events.Directory)
 		if l.Directory != nil && evt.DBHeight == l.Directory.DBHeight {
 			log.LogPrintf(logfile, "DUP Directory: %v", v)
 			continue
 		} else {
 			log.LogPrintf(logfile, "Directory: %v", v)
 		}
-		l.Directory = v.(*event.Directory)
+		l.Directory = v.(*events.Directory)
 		return
 	}
 }
 
 func (l *Leader) WaitForBalanceChanged() {
 	v := <-l.Sub.BalanceChanged.Updates
-	l.Balance = v.(*event.Balance)
+	l.Balance = v.(*events.Balance)
 	log.LogPrintf(logfile, "BalChange: %v", v)
 }
 
